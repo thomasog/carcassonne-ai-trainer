@@ -3,14 +3,16 @@ name: Validate Carcassonne AI Trainer
 on:
   push:
     paths:
-      - "AI Trainer/src/**"
-      - "AI Trainer/package.json"
+      - "src/**"
+      - "tests/**"
+      - "package.json"
       - ".github/workflows/**"
 
   pull_request:
     paths:
-      - "AI Trainer/src/**"
-      - "AI Trainer/package.json"
+      - "src/**"
+      - "tests/**"
+      - "package.json"
       - ".github/workflows/**"
 
   workflow_dispatch:
@@ -18,10 +20,6 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: "AI Trainer"
 
     steps:
       - uses: actions/checkout@v4

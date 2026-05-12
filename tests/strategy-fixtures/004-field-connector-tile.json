@@ -1,0 +1,12 @@
+{
+  "name": "field-connector-tile",
+  "boardSnapshot": { "placements": [] },
+  "tileInHand": "road-curve",
+  "player": 0,
+  "expectedMoveSet": [
+    { "x": 1, "y": 0 },
+    { "x": -1, "y": 0 },
+    { "x": 0, "y": 1 }
+  ],
+  "rationale": "A curve tile with split fields should remain a valid candidate around the start tile."
+}

@@ -9,7 +9,9 @@ import {
 } from "./game-engine.js";
 import { TILE_DEFS, START_DEF } from "./constants.js";
 import { playHeadlessGame } from "./tournament.js";
-import { buildAiConfig } from "./ai-engine.js";
+import { buildAiConfig, chooseAiMove } from "./ai-engine.js";
+import { readFile, readdir } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 let passed = 0;
 let failed = 0;
@@ -26,6 +28,55 @@ function assert(name, condition, detail = "") {
 
 function findDef(id) {
   return TILE_DEFS.find((d) => d.id === id);
+}
+
+async function runStrategyFixtures() {
+  const fixtureDir = fileURLToPath(new URL("../tests/strategy-fixtures/", import.meta.url));
+  let files = [];
+  try {
+    files = (await readdir(fixtureDir)).filter((file) => file.endsWith(".json")).sort();
+  } catch {
+    console.log("\nStrategy fixtures: none found");
+    return;
+  }
+
+  if (!files.length) {
+    console.log("\nStrategy fixtures: none found");
+    return;
+  }
+
+  console.log(`\nStrategy fixtures: ${files.length} positions`);
+  let matches = 0;
+
+  for (const file of files) {
+    const fixture = JSON.parse(await readFile(`${fixtureDir}${file}`, "utf8"));
+    const game = freshHeadlessState({ deckSeed: fixture.deckSeed ?? 1, startingPlayer: fixture.player ?? 0 });
+
+    (fixture.boardSnapshot?.placements ?? []).forEach((placement) => {
+      const def = placement.id === "start" ? START_DEF : findDef(placement.id);
+      const tile = clonePlacedTile(orientTile(def, placement.rotation ?? 0));
+      game.board.set(key(placement.x, placement.y), tile);
+      if (placement.meeple) {
+        placeMeepleInState(game, placement.x, placement.y, placement.meeple.player, placement.meeple);
+      }
+    });
+
+    const tileDef = findDef(fixture.tileInHand);
+    const config = buildAiConfig(fixture.weights ?? undefined);
+    const move = chooseAiMove(game, tileDef, fixture.player ?? 0, config, () => 0.5);
+    const ok = (fixture.expectedMoveSet ?? []).some((expected) =>
+      move &&
+      (expected.x === undefined || move.x === expected.x) &&
+      (expected.y === undefined || move.y === expected.y) &&
+      (expected.rotation === undefined || move.rotation === expected.rotation) &&
+      (expected.meepleType === undefined || move.meepleOption?.type === expected.meepleType),
+    );
+
+    if (ok) matches += 1;
+    assert(`fixture ${fixture.name ?? file}`, ok, move ? `got x=${move.x} y=${move.y} rot=${move.rotation} meeple=${move.meepleOption?.type ?? "none"}` : "no move");
+  }
+
+  console.log(`Strategy fixture agreement: ${matches}/${files.length} (${Math.round((matches / files.length) * 100)}%)`);
 }
 
 console.log("\nCarcassonne AI Trainer — Smoke Tests\n");
@@ -241,6 +292,8 @@ console.log("\nCarcassonne AI Trainer — Smoke Tests\n");
 }
 
 // ─── Summary ─────────────────────────────────────────────────────────────────
+await runStrategyFixtures();
+
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`);
 
 if (failed > 0) {

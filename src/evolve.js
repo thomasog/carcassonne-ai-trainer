@@ -8,8 +8,10 @@ import { TRAINING_PROFILES, OPPONENT_POOL_NAMES } from "./profiles.js";
 import {
   loadBestWeights, saveBestWeights, appendHistory,
   saveLeaderboard, saveSummaryCSV, saveLatestRun,
-  loadCheckpoint, saveCheckpoint,
+  loadCheckpoint, saveCheckpoint, appendReplaySamples,
+  loadHallOfFame, saveHallOfFameEntry,
 } from "./io.js";
+import { computeFitness } from "./metrics.js";
 
 const RESULTS_DIR = fileURLToPath(new URL("../results/", import.meta.url));
 
@@ -35,6 +37,9 @@ function parseArgs() {
     mutationScale: Number(get("--mutation-scale", 0.12)),
     minImprovement: Number(get("--min-improvement", 0.01)),
     minGamesToPromote: Number(get("--min-games-to-promote", 100)),
+    hallOfFameInterval: Number(get("--hall-of-fame-interval", 3)),
+    hallOfFameLimit: Number(get("--hall-of-fame-limit", 20)),
+    replayRunId: get("--replay-run-id", `run-${Date.now()}`),
   };
 }
 
@@ -78,6 +83,8 @@ function mergeStats(a, b) {
   const draws = a.draws + b.draws;
   const crashes = (a.crashes || 0) + (b.crashes || 0);
   const avgMargin = (a.avgMargin * a.games + b.avgMargin * b.games) / total;
+  const elo = 1500 + (a.eloDelta ?? ((a.elo ?? 1500) - 1500)) + (b.eloDelta ?? ((b.elo ?? 1500) - 1500));
+  const crashRate = crashes / total;
   return {
     wins, losses, draws, crashes,
     games: total,
@@ -86,8 +93,10 @@ function mergeStats(a, b) {
     winRate: wins / total,
     lossRate: losses / total,
     drawRate: draws / total,
+    elo,
+    eloDelta: elo - 1500,
     timeouts: 0,
-    fitness: (wins / total) * 100 + avgMargin * 0.8 + (draws / total) * 10 - (crashes / total) * 1000,
+    fitness: computeFitness({ elo, crashRate }),
   };
 }
 
@@ -248,8 +257,16 @@ async function evaluateCandidateIncremental(candidate, opponentProfiles, options
       runSeed: hashSeed(args.seed, "chunk", generation, options.candidateIndex, chunk),
       generation,
       candidateId: options.candidateIndex,
+      hallOfFameProfiles: state.hallOfFameProfiles,
+      collectReplay: true,
     });
     recordChunkDuration(Date.now() - chunkT0);
+
+    const replaySamples = partial.replaySamples ?? [];
+    delete partial.replaySamples;
+    if (replaySamples.length) {
+      await appendReplaySamples(`${RESULTS_DIR}replay/${args.replayRunId}.jsonl`, replaySamples);
+    }
 
     candidate.stats = mergeStats(candidate.stats, partial);
     candidate.fitness = candidate.stats.fitness;
@@ -264,7 +281,7 @@ async function evaluateCandidateIncremental(candidate, opponentProfiles, options
     const remaining = formatTime(safeDeadline - Date.now());
     const avgChunk = formatTime(movingAvg(recentChunkDurations));
     process.stdout.write(
-      `    chunk ${chunk + 1}/${totalChunks} | games=${candidate.stats.games} | fitness=${candidate.fitness.toFixed(2)} | remaining=${remaining} | avg-chunk=${avgChunk}\n`,
+      `    chunk ${chunk + 1}/${totalChunks} | games=${candidate.stats.games} | elo=${candidate.stats.elo.toFixed(1)} | fitness=${candidate.fitness.toFixed(2)} | replay+${replaySamples.length} | remaining=${remaining} | avg-chunk=${avgChunk}\n`,
     );
 
     state.candidateIndex = options.candidateIndex;
@@ -298,6 +315,12 @@ async function main() {
   console.log(`Safe deadline in: ${formatTime(safeDeadline - startedAt)}\n`);
 
   const opponentProfiles = OPPONENT_POOL_NAMES.map((name) => TRAINING_PROFILES[name]);
+  const hallOfFameEntries = await loadHallOfFame(`${RESULTS_DIR}hall-of-fame`, { limit: args.hallOfFameLimit });
+  const hallOfFameProfiles = hallOfFameEntries.map((entry) => ({
+    name: `hof:${entry.candidateId ?? entry.generation}`,
+    weights: { ...BASE_AI_WEIGHTS, ...entry.weights },
+    candidateLimit: 8,
+  }));
 
   const state = {
     args,
@@ -311,6 +334,7 @@ async function main() {
     bestSeenThisRunFitness: -Infinity,
     totalGames: 0,
     startedAt,
+    hallOfFameProfiles,
   };
 
   // Write a minimal latest-run.json immediately so artifacts are never empty
@@ -536,6 +560,26 @@ async function main() {
         globalBestFitness: state.globalBestFitness === -Infinity ? null : state.globalBestFitness,
         gamesThisRun: state.totalGames,
       });
+
+      if (elites[0] && generation % args.hallOfFameInterval === 0) {
+        await saveHallOfFameEntry(`${RESULTS_DIR}hall-of-fame`, {
+          version: 1,
+          createdAt: new Date().toISOString(),
+          generation,
+          candidateId: elites[0].id,
+          fitness: elites[0].fitness,
+          elo: elites[0].stats?.elo ?? null,
+          gamesEvaluated: elites[0].stats?.games ?? 0,
+          weights: elites[0].weights,
+        }, { limit: args.hallOfFameLimit });
+        const refreshedHall = await loadHallOfFame(`${RESULTS_DIR}hall-of-fame`, { limit: args.hallOfFameLimit });
+        state.hallOfFameProfiles = refreshedHall.map((entry) => ({
+          name: `hof:${entry.candidateId ?? entry.generation}`,
+          weights: { ...BASE_AI_WEIGHTS, ...entry.weights },
+          candidateLimit: 8,
+        }));
+        console.log(`  hall-of-fame updated: ${state.hallOfFameProfiles.length} entries`);
+      }
 
       if (!hasTimeForMoreWork()) break;
 

@@ -1,0 +1,12 @@
+{
+  "name": "safe-monastery",
+  "boardSnapshot": { "placements": [] },
+  "tileInHand": "monastery",
+  "player": 0,
+  "expectedMoveSet": [
+    { "x": 0, "y": 1 },
+    { "x": 1, "y": 0 },
+    { "x": -1, "y": 0 }
+  ],
+  "rationale": "A monastery is acceptable in an immediately adjacent legal field slot."
+}

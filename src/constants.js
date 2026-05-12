@@ -75,3 +75,14 @@ export const TILE_DEFS = [
 ];
 
 export const START_DEF = def("start", "Peça inicial", 1, "CRFR", [[1, 3]], [[0]], [[2, 7], [3, 4, 5, 6]]);
+
+export const FIELD_VERTEX_CONNECTOR_TILE_IDS = new Set([
+  "city-road-curve-left",
+  "city-road-curve-right",
+  "city-road-junction",
+  "monastery",
+  "monastery-road",
+  "road-curve",
+  "road-junction",
+  "road-cross",
+]);

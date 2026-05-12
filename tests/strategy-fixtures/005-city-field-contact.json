@@ -1,0 +1,17 @@
+{
+  "name": "city-field-contact",
+  "boardSnapshot": {
+    "placements": [
+      { "id": "city-cap", "x": 0, "y": -1, "rotation": 2 }
+    ]
+  },
+  "tileInHand": "monastery-road",
+  "player": 0,
+  "expectedMoveSet": [
+    { "x": 0, "y": 1 },
+    { "x": -1, "y": 0 },
+    { "x": 1, "y": 0 },
+    { "x": 0, "y": -2 }
+  ],
+  "rationale": "After a city is closed near the start, monastery-road placements should still evaluate without losing field context."
+}

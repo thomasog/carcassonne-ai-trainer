@@ -1,4 +1,7 @@
-import { FEATURE_KEY, DELTAS, OPPOSITE, CITY_TOUCH_CONNECTORS, TOTAL_MEEPLES } from "./constants.js";
+import {
+  FEATURE_KEY, DELTAS, OPPOSITE, CITY_TOUCH_CONNECTORS, TOTAL_MEEPLES,
+  FIELD_VERTEX_CONNECTOR_TILE_IDS,
+} from "./constants.js";
 import { randomInt, shuffleInPlace } from "./rng.js";
 import { BASE_AI_WEIGHTS } from "./ai-weights.js";
 import {
@@ -27,7 +30,30 @@ export function buildAiConfig(profileOrWeights) {
     };
   }
 
-  if (profileOrWeights.weights) return profileOrWeights;
+  if (profileOrWeights.weights) {
+    return {
+      ...profileOrWeights,
+      weights: { ...BASE_AI_WEIGHTS, ...profileOrWeights.weights },
+      multipliers: {
+        fields: 1,
+        blocking: 1,
+        invasion: 1,
+        tileCounting: 1,
+        meepleEconomy: 1,
+        ...(profileOrWeights.multipliers ?? {}),
+      },
+      replyLookahead: profileOrWeights.replyLookahead ?? false,
+      replyTileSampleSize: profileOrWeights.replyTileSampleSize ?? 0,
+      candidateLimit: profileOrWeights.candidateLimit ?? 8,
+      replyMoveLimit: profileOrWeights.replyMoveLimit ?? 0,
+      monteCarloMaxRuns: profileOrWeights.monteCarloMaxRuns ?? 0,
+      rolloutDepth: profileOrWeights.rolloutDepth ?? 0,
+      monteCarloWeight: profileOrWeights.monteCarloWeight ?? 0,
+      randomness: profileOrWeights.randomness ?? 0,
+      strategicNoise: profileOrWeights.strategicNoise ?? 0,
+      timeBudgetMs: profileOrWeights.timeBudgetMs ?? 0,
+    };
+  }
 
   return {
     weights: { ...BASE_AI_WEIGHTS, ...profileOrWeights },
@@ -271,6 +297,26 @@ export function fieldOpenness(game, field) {
   };
 }
 
+function fieldSterilityCauses(game, field, openness) {
+  let roadEdges = 0;
+  field.parts.forEach((part) => {
+    const tile = getTileAtInState(game, part.x, part.y);
+    if (!tile) return;
+    const connectors = tile.fields[part.groupIndex] || [];
+    const connectorEdges = new Set(connectors.map((connector) => Math.floor(connector / 2)));
+    tile.roads.forEach((roadGroup) => {
+      roadGroup.forEach((edge) => {
+        if (connectorEdges.has(edge)) roadEdges += 1;
+      });
+    });
+  });
+
+  return {
+    roads: roadEdges > 0,
+    edge: openness.openCells.length <= 1 || openness.openConnectors <= 2,
+  };
+}
+
 export function rawFieldValue(game, field, player, config, deckCounts) {
   const cityDetails = fieldAdjacentCityDetails(game, field, deckCounts);
 
@@ -298,9 +344,15 @@ export function rawFieldValue(game, field, player, config, deckCounts) {
 
   const openness = fieldOpenness(game, field);
   const sterile = completed === 0 && likely === 0 && speculative <= 1;
+  let sterilityCauses = { roads: false, edge: false };
 
   if (sterile) {
     value -= weighted(config, "fieldSterilePenalty", "fields");
+    if (config.weights.fieldSterileByRoads || config.weights.fieldSterileByEdge) {
+      sterilityCauses = fieldSterilityCauses(game, field, openness);
+      if (sterilityCauses.roads) value -= weighted(config, "fieldSterileByRoads", "fields");
+      if (sterilityCauses.edge) value -= weighted(config, "fieldSterileByEdge", "fields");
+    }
   }
 
   if (value > 0) {
@@ -321,6 +373,7 @@ export function rawFieldValue(game, field, player, config, deckCounts) {
     cityDetails,
     openness,
     sterile,
+    sterilityCauses,
   };
 }
 
@@ -526,6 +579,53 @@ export function fieldCuttingValueAfterMove(game, move, player, config) {
   return value;
 }
 
+function deckHasFieldConnectorTile(game) {
+  return game.deck.some((tileDef) => FIELD_VERTEX_CONNECTOR_TILE_IDS.has(tileDef.id));
+}
+
+function monasteryFieldConnectorValue(game, move, config) {
+  if (!config.weights.monasteryFieldConnector) return 0;
+  if (!move.tile.monastery) return 0;
+
+  const fields = new Set();
+  for (let edge = 0; edge < 4; edge += 1) {
+    const delta = DELTAS[edge];
+    const neighbor = getTileAtInState(game, move.x + delta.x, move.y + delta.y);
+    if (!neighbor) continue;
+    neighbor.fields.forEach((_, groupIndex) => {
+      const field = getFeatureInState(game, move.x + delta.x, move.y + delta.y, "field", groupIndex);
+      fields.add(field.signature);
+    });
+  }
+
+  return fields.size >= 2 ? weighted(config, "monasteryFieldConnector", "fields") : 0;
+}
+
+function tileVertexConnectsFieldsValue(move, config) {
+  if (!config.weights.tileVertexConnectsFields) return 0;
+  return FIELD_VERTEX_CONNECTOR_TILE_IDS.has(move.tile.defId)
+    ? weighted(config, "tileVertexConnectsFields", "fields")
+    : 0;
+}
+
+function pontoFuturoValue(game, sim, move, player, config, deckCounts) {
+  if (!config.weights.pontoFuturoBonus) return 0;
+  if (!move.meepleOption || move.meepleOption.type !== "field") return 0;
+  if (!deckHasFieldConnectorTile(game)) return 0;
+
+  const field = getFeatureInState(sim, move.x, move.y, "field", move.meepleOption.groupIndex);
+  const control = controlInfoForPlayer(sim, field, "field", player);
+  if (!control.controlledByPlayer && !control.tied) return 0;
+
+  const nearbyFields = neighboringFieldsThroughOpenCells(sim, field);
+  const hasNeighboringCityField = nearbyFields.some((otherField) => {
+    const raw = rawFieldValue(sim, otherField, player, config, deckCounts);
+    return raw.completed > 0 || raw.likely > 0;
+  });
+
+  return hasNeighboringCityField ? weighted(config, "pontoFuturoBonus", "fields") : 0;
+}
+
 export function evaluateMeepleEconomy(game, player, config) {
   const opponent = opponentOf(player);
   const own = game.players[player].meeples;
@@ -720,6 +820,9 @@ export function evaluateMoveForPlayer(game, move, player, config, options = {}) 
   score -= meepleCommitmentCost(game, move, player, config);
   score += blockingValueAfterMove(game, move, player, deckCounts, config);
   score += fieldCuttingValueAfterMove(game, move, player, config);
+  score += monasteryFieldConnectorValue(game, move, config);
+  score += tileVertexConnectsFieldsValue(move, config);
+  score += pontoFuturoValue(game, sim, move, player, config, deckCounts);
 
   if (move.meepleOption && move.meepleOption.type === "field") {
     score += farmerPlacementValue(game, move, player, config);

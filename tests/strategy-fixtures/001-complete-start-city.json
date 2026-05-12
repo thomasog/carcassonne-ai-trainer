@@ -1,0 +1,11 @@
+{
+  "name": "complete-start-city",
+  "boardSnapshot": { "placements": [] },
+  "tileInHand": "city-cap",
+  "player": 0,
+  "expectedMoveSet": [
+    { "x": 0, "y": -1, "rotation": 2 },
+    { "x": 1, "y": 0, "rotation": 3 }
+  ],
+  "rationale": "Prefer a city cap placement that connects cleanly to the starting city."
+}

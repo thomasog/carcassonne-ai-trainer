@@ -1,0 +1,13 @@
+{
+  "name": "extend-start-road",
+  "boardSnapshot": { "placements": [] },
+  "tileInHand": "road-straight",
+  "player": 0,
+  "expectedMoveSet": [
+    { "x": 1, "y": 0, "rotation": 0 },
+    { "x": -1, "y": 0, "rotation": 0 },
+    { "x": 1, "y": 0, "rotation": 2 },
+    { "x": -1, "y": 0, "rotation": 2 }
+  ],
+  "rationale": "A straight road should continue the starting road rather than be forced against a city edge."
+}

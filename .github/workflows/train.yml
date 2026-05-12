@@ -35,10 +35,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
-    defaults:
-      run:
-        working-directory: "AI Trainer"
-
     steps:
       - uses: actions/checkout@v4
 
@@ -80,17 +76,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: carcassonne-ai-results-${{ github.run_number }}
-          path: AI Trainer/results/
+          path: results/
           if-no-files-found: warn
 
       - name: Commit results
         if: always()
-        working-directory: "."
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git add "AI Trainer/results/" || true
+          git add results/ || true
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
