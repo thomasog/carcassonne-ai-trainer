@@ -18,9 +18,6 @@ No GPU. No cloud bill. Just GitHub Actions.
 GitHub Actions (every 6h)
         │
         ▼
-  node src/smoke.js          ← 21 rule validation tests
-        │
-        ▼
   node src/evolve.js         ← evolutionary training
         │
    ┌────┴────────────────────────┐
@@ -41,6 +38,8 @@ GitHub Actions (every 6h)
 ```
 
 Every chunk of evaluation is checkpointed. If the job is cancelled mid-generation, the next run resumes exactly where it left off.
+
+Smoke tests are handled by the separate validation workflow when trainer code or workflows change. Scheduled training runs skip smoke by default so the Actions budget goes to training.
 
 ---
 
@@ -74,6 +73,8 @@ run seed
 
 The same seed always produces the same game. Mirrored duels (each pair plays twice with swapped positions) cancel out first-mover advantage.
 
+GitHub Actions training uses a stable campaign seed by default (`123456789`). Keep the same seed to resume `results/checkpoint.json` across scheduled runs. Change the seed manually only when you intentionally want a fresh campaign, or remove/replace the checkpoint before restarting.
+
 ---
 
 ## Incremental training
@@ -94,15 +95,18 @@ A generation can span multiple runs. The system treats GitHub Actions as a long-
 GitHub gives **unlimited Actions minutes** for public repositories.
 
 The workflow runs every 6 hours via cron. Each run:
-- Runs 21 smoke tests
+- Skips smoke tests by default
 - Trains for up to 110 minutes
 - Commits updated weights to `results/`
 - Uploads an artifact with the full results folder
 
+The validation workflow (`.github/workflows/validate.yml`) runs smoke tests on pushes and pull requests that touch trainer code, package metadata, or workflows. Manual training has an optional `run_smoke` input for one-off checks, but scheduled training keeps it off.
+
 To start training on your own fork:
 1. Fork this repository (keep it public)
 2. Go to **Actions** → **Train Carcassonne AI** → **Run workflow**
-3. Watch the logs. Results commit automatically.
+3. Keep the default seed to continue the same training campaign, or change it to start a new one
+4. Watch the logs. Results commit automatically.
 
 ---
 
