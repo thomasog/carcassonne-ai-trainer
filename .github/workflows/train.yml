@@ -6,7 +6,7 @@ on:
       time_budget_minutes:
         description: "Training time budget in minutes"
         required: false
-        default: "105"
+        default: "110"
       population:
         description: "Population size"
         required: false
@@ -26,8 +26,7 @@ jobs:
   train:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
     defaults:
       run:
         working-directory: "AI Trainer"
@@ -46,29 +45,34 @@ jobs:
         run: |
           node src/evolve.js \
             --seed "${{ github.run_id }}" \
-            --time-budget-minutes "${{ github.event.inputs.time_budget_minutes || '105' }}" \
+            --time-budget-minutes "${{ github.event.inputs.time_budget_minutes || '110' }}" \
+            --shutdown-grace-seconds 240 \
             --population "${{ github.event.inputs.population || '24' }}" \
             --elite 6 \
             --min-games-per-candidate 20 \
             --max-games-per-candidate 500 \
+            --duel-chunk-size 2 \
             --mutation-rate 0.25 \
-            --mutation-scale 0.12
+            --mutation-scale 0.12 \
+            --min-improvement 0.01 \
+            --min-games-to-promote 100
 
       - name: Upload results
-        if: success()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: carcassonne-ai-results-${{ github.run_number }}
           path: AI Trainer/results/
+          if-no-files-found: warn
 
       - name: Commit results
-        if: success()
+        if: always()
         working-directory: "."
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git add "AI Trainer/results/"
+          git add "AI Trainer/results/" || true
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else

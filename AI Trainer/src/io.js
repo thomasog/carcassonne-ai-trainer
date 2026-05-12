@@ -58,3 +58,17 @@ export async function saveLatestRun(path, data) {
   await ensureDir(path);
   await writeFile(path, JSON.stringify(data, null, 2), "utf8");
 }
+
+export async function loadCheckpoint(path) {
+  try {
+    const text = await readFile(path, "utf8");
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+export async function saveCheckpoint(path, data) {
+  await ensureDir(path);
+  await writeFile(path, JSON.stringify(data, null, 2), "utf8");
+}
