@@ -42,6 +42,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Smoke test
         if: github.event.inputs.run_smoke == 'true'
         run: node src/smoke.js
@@ -56,11 +59,17 @@ jobs:
             --elite 6 \
             --min-games-per-candidate 20 \
             --max-games-per-candidate 500 \
-            --duel-chunk-size 2 \
+            --duel-chunk-size 1 \
+            --max-candidate-minutes 10 \
+            --max-chunk-seconds 60 \
             --mutation-rate 0.25 \
             --mutation-scale 0.12 \
             --min-improvement 0.01 \
             --min-games-to-promote 100
+
+      - name: Ensure results directory exists
+        if: always()
+        run: mkdir -p results
 
       - name: Upload results
         if: always()

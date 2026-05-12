@@ -1,3 +1,4 @@
+import { mkdir } from "node:fs/promises";
 import { mulberry32, hashSeed } from "./rng.js";
 import { BASE_AI_WEIGHTS, TRAINABLE_WEIGHTS } from "./ai-weights.js";
 import { buildAiConfig } from "./ai-engine.js";
@@ -26,7 +27,9 @@ function parseArgs() {
     elite: Number(get("--elite", 3)),
     minGamesPerCandidate: Number(get("--min-games-per-candidate", 10)),
     maxGamesPerCandidate: Number(get("--max-games-per-candidate", 200)),
-    duelChunkSize: Number(get("--duel-chunk-size", 2)),
+    duelChunkSize: Number(get("--duel-chunk-size", 1)),
+    maxCandidateMinutes: Number(get("--max-candidate-minutes", 10)),
+    maxChunkSeconds: Number(get("--max-chunk-seconds", 60)),
     mutationRate: Number(get("--mutation-rate", 0.25)),
     mutationScale: Number(get("--mutation-scale", 0.12)),
     minImprovement: Number(get("--min-improvement", 0.01)),
@@ -89,21 +92,37 @@ function mergeStats(a, b) {
 
 // ─── Timing ───────────────────────────────────────────────────────────────────
 let safeDeadline;
-const recentDurations = [];
+const recentCandidateDurations = [];
+const recentChunkDurations = [];
 
 function hasTimeForMoreWork() {
   return Date.now() < safeDeadline;
 }
 
+function movingAvg(arr) {
+  return arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
+}
+
 function hasTimeForAnotherCandidate() {
-  if (!recentDurations.length) return hasTimeForMoreWork();
-  const avg = recentDurations.reduce((s, v) => s + v, 0) / recentDurations.length;
+  const avg = movingAvg(recentCandidateDurations);
+  if (!avg) return hasTimeForMoreWork();
   return Date.now() + avg * 1.3 < safeDeadline;
 }
 
-function recordDuration(ms) {
-  recentDurations.push(ms);
-  if (recentDurations.length > 8) recentDurations.shift();
+function hasTimeForAnotherChunk() {
+  const avg = movingAvg(recentChunkDurations);
+  if (!avg) return hasTimeForMoreWork();
+  return Date.now() + avg * 1.3 < safeDeadline;
+}
+
+function recordCandidateDuration(ms) {
+  recentCandidateDurations.push(ms);
+  if (recentCandidateDurations.length > 8) recentCandidateDurations.shift();
+}
+
+function recordChunkDuration(ms) {
+  recentChunkDurations.push(ms);
+  if (recentChunkDurations.length > 16) recentChunkDurations.shift();
 }
 
 function formatTime(ms) {
@@ -115,7 +134,7 @@ function formatTime(ms) {
 // ─── Persistence ──────────────────────────────────────────────────────────────
 async function persistProgress(state) {
   const { args, generation, phase, candidateIndex, phaseCandidates, originalPopulation,
-          globalBestFitness, globalBestWeights, totalGames, startedAt } = state;
+          globalBestFitness, globalBestWeights, bestSeenThisRunFitness, totalGames, startedAt } = state;
 
   await saveCheckpoint(`${RESULTS_DIR}checkpoint.json`, {
     version: 1,
@@ -132,21 +151,23 @@ async function persistProgress(state) {
     rngPolicy: { rng: "mulberry32", mirroredDuels: true },
   });
 
-  const top = [...phaseCandidates]
-    .filter((c) => c.evaluated)
-    .sort((a, b) => b.fitness - a.fitness)
-    .slice(0, args.elite);
+  const evaluated = [...phaseCandidates].filter((c) => c.evaluated);
+  const top = [...evaluated].sort((a, b) => b.fitness - a.fitness).slice(0, args.elite);
+
+  await saveLeaderboard(`${RESULTS_DIR}leaderboard.json`, top.map((c) => ({
+    candidateId: c.id, generation, fitness: c.fitness, ...c.stats,
+  })));
 
   if (top.length) {
-    await saveLeaderboard(`${RESULTS_DIR}leaderboard.json`, top.map((c) => ({
-      candidateId: c.id, generation, fitness: c.fitness, ...c.stats,
+    await saveSummaryCSV(`${RESULTS_DIR}summary.csv`, top.map((c) => ({
+      ...c.stats, timestamp: new Date().toISOString(), generation, candidateId: c.id,
     })));
   }
 
   const elapsed = Date.now() - startedAt;
   const remaining = safeDeadline - Date.now();
   await saveLatestRun(`${RESULTS_DIR}latest-run.json`, {
-    status: "partial",
+    status: "running",
     startedAt: new Date(startedAt).toISOString(),
     updatedAt: new Date().toISOString(),
     seed: args.seed,
@@ -154,16 +175,18 @@ async function persistProgress(state) {
     phase,
     candidateIndex,
     globalBestFitness: globalBestFitness === -Infinity ? null : globalBestFitness,
+    bestSeenThisRunFitness: bestSeenThisRunFitness === -Infinity ? null : bestSeenThisRunFitness,
     gamesThisRun: totalGames,
     duelsThisRun: Math.floor(totalGames / 2),
     timeBudgetMinutes: args.timeBudgetMinutes,
     message: `Running. Gen ${generation} ${phase} candidate ${candidateIndex}. Elapsed: ${formatTime(elapsed)}, remaining: ${formatTime(remaining)}.`,
   });
+  console.log(`    checkpoint saved: results/checkpoint.json`);
 }
 
 async function finalizeRun(state, status, message) {
   const { args, generation, phase, candidateIndex, phaseCandidates,
-          globalBestFitness, totalGames, startedAt } = state;
+          globalBestFitness, bestSeenThisRunFitness, totalGames, startedAt } = state;
 
   const top = [...phaseCandidates]
     .filter((c) => c.evaluated)
@@ -189,6 +212,7 @@ async function finalizeRun(state, status, message) {
     phase,
     candidateIndex,
     globalBestFitness: globalBestFitness === -Infinity ? null : globalBestFitness,
+    bestSeenThisRunFitness: bestSeenThisRunFitness === -Infinity ? null : bestSeenThisRunFitness,
     gamesThisRun: totalGames,
     duelsThisRun: Math.floor(totalGames / 2),
     timeBudgetMinutes: args.timeBudgetMinutes,
@@ -206,17 +230,25 @@ async function evaluateCandidateIncremental(candidate, opponentProfiles, options
   const totalDuels = options.totalDuels;
   const totalChunks = Math.ceil(totalDuels / args.duelChunkSize);
   const startChunk = candidate.completedChunks || 0;
+  const candidateDeadline = Date.now() + args.maxCandidateMinutes * 60_000;
   const t0 = Date.now();
 
   for (let chunk = startChunk; chunk < totalChunks; chunk += 1) {
     if (!hasTimeForMoreWork()) break;
+    if (!hasTimeForAnotherChunk()) break;
+    if (Date.now() >= candidateDeadline) {
+      console.log(`    candidate time limit reached (${args.maxCandidateMinutes}min)`);
+      break;
+    }
 
+    const chunkT0 = Date.now();
     const partial = evaluateCandidate(config, opponentProfiles, {
       numDuels: args.duelChunkSize,
       runSeed: hashSeed(args.seed, "chunk", generation, options.candidateIndex, chunk),
       generation,
       candidateId: options.candidateIndex,
     });
+    recordChunkDuration(Date.now() - chunkT0);
 
     candidate.stats = mergeStats(candidate.stats, partial);
     candidate.fitness = candidate.stats.fitness;
@@ -224,16 +256,21 @@ async function evaluateCandidateIncremental(candidate, opponentProfiles, options
     candidate.evaluated = true;
     state.totalGames += partial.games;
 
+    if (candidate.fitness > state.bestSeenThisRunFitness) {
+      state.bestSeenThisRunFitness = candidate.fitness;
+    }
+
     const remaining = formatTime(safeDeadline - Date.now());
+    const avgChunk = formatTime(movingAvg(recentChunkDurations));
     process.stdout.write(
-      `    chunk ${chunk + 1}/${totalChunks} | games=${candidate.stats.games} | fitness=${candidate.fitness.toFixed(2)} | remaining=${remaining}\n`,
+      `    chunk ${chunk + 1}/${totalChunks} | games=${candidate.stats.games} | fitness=${candidate.fitness.toFixed(2)} | remaining=${remaining} | avg-chunk=${avgChunk}\n`,
     );
 
     state.candidateIndex = options.candidateIndex;
     await persistProgress(state);
   }
 
-  recordDuration(Date.now() - t0);
+  recordCandidateDuration(Date.now() - t0);
   return candidate;
 }
 
@@ -252,8 +289,11 @@ async function main() {
   const startedAt = Date.now();
   safeDeadline = startedAt + args.timeBudgetMinutes * 60_000 - args.shutdownGraceSeconds * 1_000;
 
+  // Guarantee results/ always exists — even if training is cancelled before first save
+  await mkdir(RESULTS_DIR, { recursive: true });
+
   console.log(`\nCarcassonne AI Trainer — Incremental Evolutionary Optimizer`);
-  console.log(`Seed: ${args.seed} | Budget: ${args.timeBudgetMinutes}min | Grace: ${args.shutdownGraceSeconds}s | Population: ${args.population}`);
+  console.log(`Seed: ${args.seed} | Budget: ${args.timeBudgetMinutes}min | Grace: ${args.shutdownGraceSeconds}s | Pop: ${args.population} | Chunk: ${args.duelChunkSize} | MaxCandidate: ${args.maxCandidateMinutes}min`);
   console.log(`Safe deadline in: ${formatTime(safeDeadline - startedAt)}\n`);
 
   const opponentProfiles = OPPONENT_POOL_NAMES.map((name) => TRAINING_PROFILES[name]);
@@ -267,9 +307,28 @@ async function main() {
     originalPopulation: [],
     globalBestFitness: -Infinity,
     globalBestWeights: {},
+    bestSeenThisRunFitness: -Infinity,
     totalGames: 0,
     startedAt,
   };
+
+  // Write a minimal latest-run.json immediately so artifacts are never empty
+  await saveLatestRun(`${RESULTS_DIR}latest-run.json`, {
+    status: "started",
+    startedAt: new Date(startedAt).toISOString(),
+    updatedAt: new Date(startedAt).toISOString(),
+    seed: args.seed,
+    generation: 1,
+    phase: "init",
+    candidateIndex: 0,
+    globalBestFitness: null,
+    bestSeenThisRunFitness: null,
+    gamesThisRun: 0,
+    duelsThisRun: 0,
+    timeBudgetMinutes: args.timeBudgetMinutes,
+    message: "Training started.",
+  });
+  await saveLeaderboard(`${RESULTS_DIR}leaderboard.json`, []);
 
   // Signal handlers for graceful shutdown
   const gracefulShutdown = async (signal) => {
