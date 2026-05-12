@@ -1,0 +1,15 @@
+{
+  "status": "partial",
+  "startedAt": "2026-05-12T16:17:10.863Z",
+  "updatedAt": "2026-05-12T17:50:54.847Z",
+  "seed": 25747262998,
+  "generation": 1,
+  "phase": "phase1",
+  "candidateIndex": 5,
+  "globalBestFitness": null,
+  "bestSeenThisRunFitness": 90.4,
+  "gamesThisRun": 120,
+  "duelsThisRun": 60,
+  "timeBudgetMinutes": 110,
+  "message": "Stopped at gen 1 phase1 candidate 6 before safe deadline."
+}
