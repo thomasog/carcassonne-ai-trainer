@@ -35,12 +35,15 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
+        working-directory: AI Trainer
         run: npm ci
 
       - name: Smoke test
+        working-directory: AI Trainer
         run: npm run smoke
 
       - name: Train
+        working-directory: AI Trainer
         run: |
           node src/evolve.js \
             --seed "${{ github.run_id }}" \
@@ -53,15 +56,17 @@ jobs:
             --mutation-scale 0.12
 
       - name: Upload results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: carcassonne-ai-results-${{ github.run_number }}
-          path: results/
+          path: AI Trainer/results/
 
       - name: Commit results
+        if: always()
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add results/
+          git add "AI Trainer/results/"
           git commit -m "chore: update trained Carcassonne AI weights (run ${{ github.run_number }})" || echo "No changes to commit"
           git push
