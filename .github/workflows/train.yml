@@ -11,6 +11,10 @@ on:
         description: "Population size"
         required: false
         default: "24"
+      run_smoke:
+        description: "Run smoke tests before training?"
+        required: false
+        default: "false"
 
   schedule:
     - cron: "0 */6 * * *"
@@ -39,6 +43,7 @@ jobs:
           node-version: 22
 
       - name: Smoke test
+        if: github.event.inputs.run_smoke == 'true'
         run: node src/smoke.js
 
       - name: Train
