@@ -11,6 +11,10 @@ on:
         description: "Population size"
         required: false
         default: "24"
+      seed:
+        description: "Stable training campaign seed. Keep the same value to resume checkpoints; change it to start a new campaign."
+        required: false
+        default: "123456789"
       run_smoke:
         description: "Run smoke tests before training?"
         required: false
@@ -52,7 +56,7 @@ jobs:
       - name: Train
         run: |
           node src/evolve.js \
-            --seed "${{ github.run_id }}" \
+            --seed "${{ github.event.inputs.seed || '123456789' }}" \
             --time-budget-minutes "${{ github.event.inputs.time_budget_minutes || '110' }}" \
             --shutdown-grace-seconds 240 \
             --population "${{ github.event.inputs.population || '24' }}" \
