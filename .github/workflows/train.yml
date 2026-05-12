@@ -26,6 +26,8 @@ jobs:
   train:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - uses: actions/checkout@v4
@@ -34,13 +36,9 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
-        working-directory: AI Trainer
-        run: npm ci
-
       - name: Smoke test
         working-directory: AI Trainer
-        run: npm run smoke
+        run: node src/smoke.js
 
       - name: Train
         working-directory: AI Trainer
@@ -56,17 +54,22 @@ jobs:
             --mutation-scale 0.12
 
       - name: Upload results
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: carcassonne-ai-results-${{ github.run_number }}
           path: AI Trainer/results/
 
       - name: Commit results
-        if: always()
+        if: success()
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
           git add "AI Trainer/results/"
-          git commit -m "chore: update trained Carcassonne AI weights (run ${{ github.run_number }})" || echo "No changes to commit"
-          git push
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update trained Carcassonne AI weights (run ${{ github.run_number }})"
+            git push
+          fi
