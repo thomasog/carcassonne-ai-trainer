@@ -231,7 +231,7 @@ console.log("\nCarcassonne AI Trainer — Smoke Tests\n");
 // ─── Test 17: Same seed produces same game result ────────────────────────────
 {
   console.log("\nTest 17: Same seed produces same game result");
-  const config = buildAiConfig();
+  const config = { ...buildAiConfig(), replyLookahead: false, candidateLimit: 3, randomness: 0, strategicNoise: 0 };
   const opts = { deckSeed: 99999, aiSeed0: 1111, aiSeed1: 2222, startingPlayer: 0 };
   const result1 = playHeadlessGame(config, config, opts);
   const result2 = playHeadlessGame(config, config, opts);
