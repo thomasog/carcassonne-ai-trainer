@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Como configurar o GitHub Actions — Carcassonne AI Trainer</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+      color: #1c1e23;
+      background: #f6f8fa;
+      line-height: 1.6;
+    }
+    h1 { font-size: 1.75rem; margin-bottom: 0.25rem; color: #0d1117; }
+    h2 { font-size: 1.2rem; margin-top: 2.5rem; border-bottom: 2px solid #e1e4e8; padding-bottom: 0.35rem; }
+    .badge {
+      display: inline-block;
+      background: #2da44e;
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+      vertical-align: middle;
+      margin-left: 0.4rem;
+    }
+    .badge.free { background: #0969da; }
+    .step {
+      background: #fff;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      padding: 1.2rem 1.4rem;
+      margin-bottom: 1.2rem;
+    }
+    .step-number {
+      display: inline-block;
+      background: #0d1117;
+      color: #fff;
+      border-radius: 50%;
+      width: 26px;
+      height: 26px;
+      line-height: 26px;
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+    .step h3 { display: inline; font-size: 1rem; vertical-align: middle; }
+    .step p, .step ul { margin: 0.7rem 0 0; }
+    code {
+      background: #f0f3f6;
+      border: 1px solid #dce0e6;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.88em;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+    pre {
+      background: #0d1117;
+      color: #e6edf3;
+      border-radius: 8px;
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+    pre code { background: none; border: none; color: inherit; padding: 0; font-size: inherit; }
+    .tip {
+      background: #ddf4ff;
+      border-left: 4px solid #0969da;
+      padding: 0.7rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin: 0.8rem 0;
+      font-size: 0.93rem;
+    }
+    .warn {
+      background: #fff8c5;
+      border-left: 4px solid #d29922;
+      padding: 0.7rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin: 0.8rem 0;
+      font-size: 0.93rem;
+    }
+    a { color: #0969da; }
+    .filelist {
+      font-family: monospace;
+      background: #f0f3f6;
+      border-radius: 6px;
+      padding: 0.8rem 1rem;
+      font-size: 0.88rem;
+      line-height: 1.8;
+    }
+    img.screenshot { max-width: 100%; border: 1px solid #d0d7de; border-radius: 6px; margin: 0.6rem 0; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+    th, td { border: 1px solid #d0d7de; padding: 0.5rem 0.75rem; text-align: left; }
+    th { background: #f6f8fa; }
+  </style>
+</head>
+<body>
+
+<h1>🧩 Carcassonne AI Trainer</h1>
+<p>Como publicar no GitHub e rodar o treinamento automático <span class="badge free">GRÁTIS</span></p>
+
+<h2>Visão geral</h2>
+<p>
+  O GitHub Actions oferece <strong>2.000 minutos/mês gratuitos</strong> para repositórios
+  públicos (e privados na conta gratuita). O workflow roda a cada 6 horas e usa no máximo
+  120 minutos por execução — então, em tese, você treina continuamente sem custo.
+</p>
+<table>
+  <tr><th>Recurso</th><th>Limite gratuito</th><th>Uso estimado</th></tr>
+  <tr><td>Minutos de Actions (Ubuntu)</td><td>2.000 min/mês</td><td>~120 min × 4/dia = 480 min/dia</td></tr>
+  <tr><td>Armazenamento de Artifacts</td><td>500 MB</td><td>~1–5 MB por run</td></tr>
+  <tr><td>Repositório público</td><td>Ilimitado</td><td>—</td></tr>
+</table>
+<div class="warn">Se ultrapassar 2.000 min/mês no plano gratuito, o workflow simplesmente para até o próximo mês. Nada é cobrado automaticamente.</div>
+
+<h2>Arquivos que precisam estar no repositório</h2>
+<div class="filelist">
+📁 raiz do repositório<br>
+├── package.json<br>
+├── src/<br>
+│   ├── constants.js<br>
+│   ├── rng.js<br>
+│   ├── game-engine.js<br>
+│   ├── ai-weights.js<br>
+│   ├── ai-engine.js<br>
+│   ├── profiles.js<br>
+│   ├── tournament.js<br>
+│   ├── metrics.js<br>
+│   ├── io.js<br>
+│   ├── smoke.js<br>
+│   └── evolve.js<br>
+└── .github/<br>
+&nbsp;&nbsp;&nbsp;&nbsp;└── workflows/<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── train.yml
+</div>
+
+<h2>Passo a passo</h2>
+
+<div class="step">
+  <span class="step-number">1</span>
+  <h3>Crie uma conta no GitHub (se não tiver)</h3>
+  <p>Acesse <a href="https://github.com" target="_blank">github.com</a> e crie uma conta gratuita. Não precisa de cartão de crédito.</p>
+</div>
+
+<div class="step">
+  <span class="step-number">2</span>
+  <h3>Crie um novo repositório</h3>
+  <ul>
+    <li>Clique no botão <strong>+</strong> no canto superior direito → <em>New repository</em>.</li>
+    <li>Nome sugerido: <code>carcassonne-ai-trainer</code></li>
+    <li>Visibilidade: <strong>Public</strong> (para ter Actions ilimitado) ou <strong>Private</strong> (2.000 min/mês).</li>
+    <li>Marque <em>Add a README file</em> para que o repositório já seja inicializado.</li>
+    <li>Clique em <strong>Create repository</strong>.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-number">3</span>
+  <h3>Faça upload dos arquivos</h3>
+  <p>Existem duas formas:</p>
+
+  <p><strong>Opção A — Interface web (mais simples, sem instalar nada):</strong></p>
+  <ul>
+    <li>Na página do repositório, clique em <strong>Add file → Upload files</strong>.</li>
+    <li>Arraste a pasta <code>AI Trainer/</code> inteira <em>ou</em> os arquivos individualmente.</li>
+    <li>
+      <strong>Atenção:</strong> a estrutura de pastas precisa ser preservada. Para subir
+      <code>.github/workflows/train.yml</code> pela interface web, você precisa criar o caminho manualmente:
+      clique em <em>Create new file</em>, escreva <code>.github/workflows/train.yml</code> no campo de nome
+      e cole o conteúdo do arquivo.
+    </li>
+    <li>Commit direto na branch <code>main</code>.</li>
+  </ul>
+
+  <p><strong>Opção B — Git pela linha de comando (recomendado):</strong></p>
+  <pre><code># Clone o repositório vazio
+git clone https://github.com/SEU_USUARIO/carcassonne-ai-trainer.git
+cd carcassonne-ai-trainer
+
+# Copie os arquivos da pasta "AI Trainer/" para dentro do clone
+# (ajuste o caminho conforme seu sistema)
+cp -r "/caminho/para/AI Trainer/src" .
+cp -r "/caminho/para/AI Trainer/.github" .
+cp "/caminho/para/AI Trainer/package.json" .
+
+# Commit e push
+git add .
+git commit -m "feat: adicionar AI Trainer inicial"
+git push origin main</code></pre>
+</div>
+
+<div class="step">
+  <span class="step-number">4</span>
+  <h3>Ative o GitHub Actions</h3>
+  <ul>
+    <li>No repositório, clique na aba <strong>Actions</strong>.</li>
+    <li>Se aparecer uma mensagem pedindo para habilitar workflows, clique em <em>I understand my workflows, go ahead and enable them</em>.</li>
+    <li>Você verá o workflow <strong>Train Carcassonne AI</strong> listado.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-number">5</span>
+  <h3>Rode o treinamento manualmente pela primeira vez</h3>
+  <ul>
+    <li>Na aba <strong>Actions</strong>, clique em <strong>Train Carcassonne AI</strong>.</li>
+    <li>Clique em <strong>Run workflow</strong> (lado direito).</li>
+    <li>Você pode ajustar o tempo de orçamento e o tamanho da população, ou deixar os valores padrão.</li>
+    <li>Clique em <strong>Run workflow</strong> para iniciar.</li>
+  </ul>
+  <div class="tip">O primeiro run executa o <code>npm run smoke</code> automaticamente. Se algum teste falhar, o workflow para e você verá o erro em vermelho.</div>
+</div>
+
+<div class="step">
+  <span class="step-number">6</span>
+  <h3>Acompanhe o progresso</h3>
+  <ul>
+    <li>Clique no run em execução para ver os logs em tempo real.</li>
+    <li>O step <em>Train</em> imprime o fitness de cada geração no log.</li>
+    <li>Ao terminar, o step <em>Upload results</em> salva os arquivos como Artifact (botão <em>Artifacts</em> no canto inferior da página do run).</li>
+    <li>O step <em>Commit results</em> faz um commit automático na branch <code>main</code> com os arquivos atualizados em <code>results/</code>.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-number">7</span>
+  <h3>Verifique os resultados</h3>
+  <ul>
+    <li>No repositório, navegue até a pasta <code>results/</code>.</li>
+    <li><code>best-weights.json</code> — os melhores pesos encontrados até agora.</li>
+    <li><code>leaderboard.json</code> — top candidatos da última geração.</li>
+    <li><code>history.jsonl</code> — histórico de todas as gerações.</li>
+    <li><code>summary.csv</code> — tabela com fitness, winRate, avgMargin por run.</li>
+    <li><code>latest-run.json</code> — resumo da última execução.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <span class="step-number">8</span>
+  <h3>Treinamento agendado automático</h3>
+  <p>
+    O workflow já está configurado para rodar automaticamente a cada 6 horas via cron
+    (<code>0 */6 * * *</code>). Não precisa fazer mais nada — depois do primeiro run manual,
+    o treinamento continuará sozinho, acumulando os melhores pesos a cada ciclo.
+  </p>
+  <div class="warn">
+    O GitHub pode pausar workflows agendados em repositórios sem atividade por 60 dias.
+    Para evitar isso, você pode fazer um pequeno commit manual de tempos em tempos, ou
+    usar o botão <em>Run workflow</em> manualmente uma vez por mês.
+  </div>
+</div>
+
+<div class="step">
+  <span class="step-number">9</span>
+  <h3>Incorporar os pesos treinados no jogo</h3>
+  <p>Após alguns ciclos de treinamento, você pode copiar os pesos para o web app:</p>
+  <pre><code>// No main.js do web app, substitua os valores em AI_WEIGHTS pelos de best-weights.json:
+// Abra results/best-weights.json e copie os valores de "weights"
+
+const AI_WEIGHTS = {
+  // ... pesos base ...
+  completedCityFieldValue: 3.82,  // ← substituído pelo valor treinado
+  nearCompleteCityFieldValue: 2.41,
+  // etc.
+};</code></pre>
+  <p>Ou usando import dinâmico (se converter o web app para ES modules):</p>
+  <pre><code>import bestWeights from "../results/best-weights.json" assert { type: "json" };
+
+const AI_WEIGHTS = {
+  ...BASE_AI_WEIGHTS,
+  ...bestWeights.weights,
+};</code></pre>
+</div>
+
+<h2>Dúvidas frequentes</h2>
+
+<table>
+  <tr>
+    <th>Dúvida</th>
+    <th>Resposta</th>
+  </tr>
+  <tr>
+    <td>Preciso pagar alguma coisa?</td>
+    <td>Não. Repositório público tem Actions ilimitado. Repositório privado tem 2.000 min/mês gratuitos.</td>
+  </tr>
+  <tr>
+    <td>O workflow falhou no smoke test. O que fazer?</td>
+    <td>Clique no step <em>Smoke test</em> para ver qual dos 17 testes falhou. Há um bug na extração das regras que precisa ser corrigido.</td>
+  </tr>
+  <tr>
+    <td>Como parar o treinamento agendado?</td>
+    <td>Na aba Actions, clique no workflow → <em>⋯ → Disable workflow</em>.</td>
+  </tr>
+  <tr>
+    <td>Como ver quanto minuto de Actions já usei?</td>
+    <td>Settings → Billing and plans → Usage this month.</td>
+  </tr>
+  <tr>
+    <td>Posso rodar localmente também?</td>
+    <td>Sim. <code>cd "AI Trainer" && npm run smoke</code> valida as regras. <code>npm run evolve</code> treina por 20 minutos localmente.</td>
+  </tr>
+</table>
+
+</body>
+</html>

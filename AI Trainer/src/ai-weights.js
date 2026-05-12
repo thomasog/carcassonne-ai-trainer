@@ -1,0 +1,73 @@
+export const BASE_AI_WEIGHTS = {
+  scoreDelta: 5.0,
+
+  meepleAvailable: 1.2,
+  instantReturnMeepleBonus: 2.2,
+  farmerCommitmentCost: 2.8,
+  cityMeepleCost: 1.3,
+  roadMeepleCost: 1.0,
+  monasteryMeepleCost: 1.2,
+  lowMeepleMultiplier: 2.2,
+  mediumMeepleMultiplier: 1.45,
+
+  cityCurrentValue: 1.0,
+  cityCompletionValue: 2.8,
+  cityFeedsOwnField: 1.4,
+  cityFeedsOpponentField: 1.8,
+  cityInvasionRisk: 2.0,
+
+  roadCurrentValue: 0.55,
+  roadCompletionValue: 1.2,
+  roadBlocksField: 0.9,
+  roadBlocksOpponentCity: 1.5,
+
+  monasteryCurrentValue: 1.1,
+  monasteryCompletion: 2.4,
+  monasteryLocalActivity: 0.7,
+  monasteryIsolationPenalty: 0.25,
+
+  completedCityFieldValue: 3.3,
+  nearCompleteCityFieldValue: 2.2,
+  futureCityFieldValue: 0.75,
+  fieldMergePotential: 2.4,
+  fieldInvasionRisk: 2.6,
+  fieldSterilePenalty: 5.0,
+  futureFieldInvasion: 2.4,
+
+  attack: 1.2,
+  defense: 1.0,
+  blocking: 1.35,
+  deadCellDamage: 3.2,
+  scarcityDamage: 1.0,
+  minFitsDamage: 1.4,
+  opponentReplyPenalty: 0.65,
+
+  earlyFieldMultiplier: 1.15,
+  midFieldMultiplier: 1.0,
+  lateFieldMultiplier: 0.75,
+  lateConcretePointsMultiplier: 1.6,
+  lateBlockingMultiplier: 1.4,
+};
+
+export const TRAINABLE_WEIGHTS = {
+  completedCityFieldValue: [2.0, 5.5],
+  nearCompleteCityFieldValue: [0.8, 4.0],
+  futureCityFieldValue: [0.1, 1.8],
+  fieldMergePotential: [0.5, 5.0],
+  fieldInvasionRisk: [0.5, 5.0],
+  fieldSterilePenalty: [1.5, 9.0],
+  futureFieldInvasion: [0.5, 5.0],
+
+  opponentReplyPenalty: [0.15, 1.0],
+  cityCompletionValue: [1.2, 4.0],
+  cityCurrentValue: [0.4, 2.0],
+  cityFeedsOwnField: [0.2, 3.5],
+  cityFeedsOpponentField: [0.2, 4.0],
+
+  farmerCommitmentCost: [0.8, 6.0],
+  meepleAvailable: [0.3, 3.0],
+  blocking: [0.3, 3.5],
+  deadCellDamage: [1.0, 6.0],
+  scarcityDamage: [0.2, 3.0],
+  minFitsDamage: [0.2, 4.0],
+};

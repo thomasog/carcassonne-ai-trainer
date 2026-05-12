@@ -1,0 +1,13 @@
+{
+  "name": "carcassonne-ai-trainer",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "smoke": "node src/smoke.js",
+    "duel": "node src/tournament.js --duel",
+    "evolve": "node src/evolve.js --time-budget-minutes 20 --population 12",
+    "train:local": "node src/evolve.js --time-budget-minutes 120 --population 24 --elite 6"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
