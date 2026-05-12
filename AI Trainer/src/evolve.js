@@ -1,4 +1,5 @@
 import { mkdir } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { mulberry32, hashSeed } from "./rng.js";
 import { BASE_AI_WEIGHTS, TRAINABLE_WEIGHTS } from "./ai-weights.js";
 import { buildAiConfig } from "./ai-engine.js";
@@ -10,7 +11,7 @@ import {
   loadCheckpoint, saveCheckpoint,
 } from "./io.js";
 
-const RESULTS_DIR = new URL("../results/", import.meta.url).pathname;
+const RESULTS_DIR = fileURLToPath(new URL("../results/", import.meta.url));
 
 // ─── CLI argument parsing ─────────────────────────────────────────────────────
 function parseArgs() {
