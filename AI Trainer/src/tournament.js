@@ -40,8 +40,9 @@ export function playHeadlessGame(configA, configB, options = {}) {
   const [scoreA, scoreB] = [game.players[0].score, game.players[1].score];
   const winner = scoreA > scoreB ? 0 : scoreB > scoreA ? 1 : null;
   const margin = Math.abs(scoreA - scoreB);
+  const signedMargin = scoreA - scoreB;
 
-  return { scores: [scoreA, scoreB], winner, margin, turns: game.turns };
+  return { scores: [scoreA, scoreB], winner, margin, signedMargin, turns: game.turns };
 }
 
 function aggregateMirroredResults(game1, game2, candidateIsPlayer0InGame1) {

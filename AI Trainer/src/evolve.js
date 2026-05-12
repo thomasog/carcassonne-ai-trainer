@@ -18,7 +18,7 @@ function parseArgs() {
     return i >= 0 && args[i + 1] !== undefined ? args[i + 1] : def;
   };
   return {
-    seed: Number(get("--seed", Math.floor(Math.random() * 1e9))),
+    seed: Number(get("--seed", 123456789)),
     timeBudgetMinutes: Number(get("--time-budget-minutes", 20)),
     population: Number(get("--population", 12)),
     elite: Number(get("--elite", 3)),

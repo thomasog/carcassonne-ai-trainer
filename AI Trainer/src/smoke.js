@@ -46,8 +46,9 @@ console.log("\nCarcassonne AI Trainer — Smoke Tests\n");
   console.log("\nTest 2: Legal adjacent placement");
   const game = freshHeadlessState({ deckSeed: 1 });
   const fieldTile = orientTile(findDef("monastery"), 0);
-  const canPlace = canPlaceInState(game, fieldTile, 1, 0);
-  assert("monastery (FFFF) can be placed adjacent to start tile (CRFR) on east side", canPlace);
+  // Start tile is CRFR; south edge (index 2) = F, monastery is FFFF — compatible
+  const canPlace = canPlaceInState(game, fieldTile, 0, 1);
+  assert("monastery (FFFF) can be placed adjacent to start tile (CRFR) on south side", canPlace);
 }
 
 // ─── Test 3: Closed city scores correctly ────────────────────────────────────
@@ -125,14 +126,16 @@ console.log("\nCarcassonne AI Trainer — Smoke Tests\n");
 // ─── Test 8: Meeple on feature completed same turn scores ────────────────────
 {
   console.log("\nTest 8: Meeple on feature completed same turn scores");
+  // city-cap (CFFF) rotation 2 → city on south edge, placed at (0,-1)
+  // Connects to start tile's north edge (C) → 2-tile closed city, no shield → 4 pts
   const game = freshHeadlessState({ deckSeed: 1 });
-  const cityCompleteDef = findDef("city-complete");
-  const tile = clonePlacedTile(orientTile(cityCompleteDef, 0));
-  game.board.set(key(1, 0), tile);
-  placeMeepleInState(game, 1, 0, 0, { type: "city", groupIndex: 0 });
+  const capTile = clonePlacedTile(orientTile(findDef("city-cap"), 2));
+  game.board.set(key(0, -1), capTile);
+  placeMeepleInState(game, 0, -1, 0, { type: "city", groupIndex: 0 });
   const before = game.players[0].score;
-  scoreCompletedFeaturesAtInState(game, 1, 0);
+  scoreCompletedFeaturesAtInState(game, 0, -1);
   assert("score increased after placing meeple on completed city", game.players[0].score > before, `before=${before} after=${game.players[0].score}`);
+  assert("2-tile city with no shield scores 4", game.players[0].score - before === 4, `got ${game.players[0].score - before}`);
 }
 
 // ─── Test 9: Farmer does not score during game ───────────────────────────────
@@ -159,22 +162,35 @@ console.log("\nCarcassonne AI Trainer — Smoke Tests\n");
   assert("field scores at game end (score changed)", game.players[0].score >= before);
 }
 
-// ─── Test 11: Field scores 3 per complete adjacent city ──────────────────────
+// ─── Test 11a: Field scores exactly +3 per completed adjacent city ───────────
 {
-  console.log("\nTest 11: Field scores 3 per completed adjacent city");
+  console.log("\nTest 11a: Field scores +3 for 1 farmer adjacent to 1 complete city");
+  // Layout: city-cap (rotation 2, city=south) at (0,-1) closes with start's north city.
+  // monastery (FFFF) at (0,1) is in the field south of start, touching that closed city.
+  // Player 0 places farmer on monastery's field, then scoreFinalFeaturesInState.
   const game = freshHeadlessState({ deckSeed: 1 });
-  const cityCap = clonePlacedTile(orientTile(findDef("city-cap"), 0));
-  game.board.set(key(1, 0), cityCap);
-  const roadStraight = clonePlacedTile(orientTile(findDef("road-straight"), 0));
-  game.board.set(key(-1, 0), roadStraight);
-
-  const monTile = clonePlacedTile(orientTile(findDef("monastery"), 0));
-  game.board.set(key(0, 1), monTile);
+  game.board.set(key(0, -1), clonePlacedTile(orientTile(findDef("city-cap"), 2)));
+  game.board.set(key(0, 1), clonePlacedTile(orientTile(findDef("monastery"), 0)));
   placeMeepleInState(game, 0, 1, 0, { type: "field", groupIndex: 0 });
+  const before = game.players[0].score;
+  scoreFinalFeaturesInState(game);
+  assert("farmer adjacent to 1 complete city scores exactly +3", game.players[0].score - before === 3, `got ${game.players[0].score - before}`);
+}
 
-  const field = getFeatureInState(game, 0, 1, "field", 0);
-  const completedCities = fieldAdjacentCompletedCitiesInState(game, field);
-  assert("field adjacent completed city count is non-negative", completedCities.size >= 0);
+// ─── Test 11b: Tied field majority — both players score +3 ───────────────────
+{
+  console.log("\nTest 11b: Tied field majority — both players score +3");
+  const game = freshHeadlessState({ deckSeed: 1 });
+  game.board.set(key(0, -1), clonePlacedTile(orientTile(findDef("city-cap"), 2)));
+  game.board.set(key(0, 1), clonePlacedTile(orientTile(findDef("monastery"), 0)));
+  game.board.set(key(1, 1), clonePlacedTile(orientTile(findDef("monastery"), 0)));
+  placeMeepleInState(game, 0, 1, 0, { type: "field", groupIndex: 0 });
+  placeMeepleInState(game, 1, 1, 1, { type: "field", groupIndex: 0 });
+  const before0 = game.players[0].score;
+  const before1 = game.players[1].score;
+  scoreFinalFeaturesInState(game);
+  assert("tied field majority: player 0 scores +3", game.players[0].score - before0 === 3, `got ${game.players[0].score - before0}`);
+  assert("tied field majority: player 1 scores +3", game.players[1].score - before1 === 3, `got ${game.players[1].score - before1}`);
 }
 
 // ─── Test 12: Tied field majority scores for both ────────────────────────────
