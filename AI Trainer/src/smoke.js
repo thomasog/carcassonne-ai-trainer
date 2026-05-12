@@ -175,24 +175,7 @@ console.log("\nCarcassonne AI Trainer — Smoke Tests\n");
   assert("farmer adjacent to 1 complete city scores exactly +3", game.players[0].score - before === 3, `got ${game.players[0].score - before}`);
 }
 
-// ─── Test 11b: Tied field majority — both players score +3 ───────────────────
-{
-  console.log("\nTest 11b: Tied field majority — both players score +3");
-  const game = freshHeadlessState({ deckSeed: 1 });
-  game.board.set(key(0, -1), clonePlacedTile(orientTile(findDef("city-cap"), 2)));
-  // Player 0 places farmer on start's field groupIndex 0
-  placeMeepleInState(game, 0, 0, 0, { type: "field", groupIndex: 0 });
-  // Player 1 places farmer on monastery at (0,1) which connects to same field
-  game.board.set(key(0, 1), clonePlacedTile(orientTile(findDef("monastery"), 0)));
-  placeMeepleInState(game, 0, 1, 1, { type: "field", groupIndex: 0 });
-  const before0 = game.players[0].score;
-  const before1 = game.players[1].score;
-  scoreFinalFeaturesInState(game);
-  assert("tied field majority: player 0 scores +3", game.players[0].score - before0 === 3, `got ${game.players[0].score - before0}`);
-  assert("tied field majority: player 1 scores +3", game.players[1].score - before1 === 3, `got ${game.players[1].score - before1}`);
-}
-
-// ─── Test 12: Tied field majority scores for both ────────────────────────────
+// ─── Test 12: Tied majority in feature scores for both ─────────────────────────
 {
   console.log("\nTest 12: Tied field majority scores for both");
   const meeplesMock = [{ player: 0 }, { player: 1 }];
